@@ -138,11 +138,9 @@ Response:
 {
   "success": true,
   "query": "your query",
-  "result": "AI-generated response",
-  "routing": {
-    "handler": "crud|pdf|multi",
-    "confidence": 0.95
-  }
+  "result": "Unified AI-generated response",
+  "attempts": 1,
+  "pattern": "supervisor_multi_agent"
 }
 ```
 
@@ -156,19 +154,54 @@ Indexes all PDFs in the `resources/` directory.
 
 ## 🏗️ Architecture
 
-### Agent System
-- **Orchestrator Agent**: Routes queries to appropriate specialist agents
-- **CRUD Agent**: Handles database operations with Person and Bank MCP servers
-- **PDF Agent**: Performs document search using RAG pipeline
+### Supervisor Multi-Agent Pattern (3 Agents)
+
+The system uses an intelligent supervisor pattern with three specialized agents:
+
+#### 1. **Supervisor Agent** (Router, Validator & Synthesizer)
+- **Role**: Query routing, answer validation, and response synthesis
+- **Capabilities**:
+  - Analyzes queries to determine data source (database vs documents)
+  - Routes to appropriate worker agents based on database schema awareness
+  - Validates worker responses and can request retries (max 3 attempts)
+  - Synthesizes multiple agent outputs into unified, natural responses
+  - Never mentions "agents" or technical details to users
+
+#### 2. **MCP Agent** (Database & Profile Operations)
+- **Role**: Database operations and social profile enrichment
+- **Tools**:
+  - Person MCP Server: CRUD operations for persons (id, name, age, email)
+  - Bank MCP Server: CRUD operations for bank accounts
+  - ProfileSearchTool: GitHub and LinkedIn profile discovery
+- **Behavior**: For "tell me about X" queries, automatically fetches:
+  - Complete person record
+  - ALL bank accounts
+  - Social media profiles
+
+#### 3. **RAG Agent** (Document & Privacy Specialist)
+- **Role**: Document search with privacy protection
+- **Tools**:
+  - SearchDocumentsTool: PDF document retrieval via Qdrant
+  - ProfileSearchTool: Additional profile search capability
+- **Special Feature**: Automatic Aadhar number masking (XXXX-XXXX-[last 4])
+
+### Routing Intelligence
+
+The supervisor uses schema-based routing:
+- **MCP Only**: Queries for database fields (age, email, bank balance)
+- **RAG Only**: Queries for document data (engine number, insurance, Aadhar)
+- **Both Agents**: Queries needing database AND document information
 
 ### MCP Servers
 - **Person Server** (`mcp_servers/person_server.py`): Manages person records
 - **Bank Server** (`mcp_servers/bank_server.py`): Manages bank accounts
+- Both servers use FastMCP framework with stdio transport
 
 ### RAG Pipeline
 - Uses Qdrant vector database for document storage
 - Sentence transformers for embeddings
 - Supports PDF document indexing and retrieval
+- Automatic privacy protection for sensitive data
 
 
 ## 🐛 Troubleshooting
@@ -197,27 +230,27 @@ Indexes all PDFs in the `resources/` directory.
 ```
 hackathon/
 ├── main.py                 # FastAPI server entry point
-├── crew_v2.py             # CrewAI agent orchestration
+├── crew_supervisor.py      # Supervisor multi-agent pattern implementation
 ├── config.py              # Configuration settings
 ├── load_env.py            # Environment variable loader
 ├── requirements.txt       # Python dependencies
 ├── .env.example          # Environment variables template
 ├── config/
-│   ├── agents.yaml       # Agent configurations
-│   └── tasks.yaml        # Task definitions
+│   ├── agents.yaml       # Agent configurations (3 agents)
+│   └── tasks.yaml        # Task definitions with routing logic
 ├── mcp_servers/
-│   ├── person_server.py  # Person CRUD MCP server
-│   └── bank_server.py    # Bank account MCP server
+│   ├── person_server.py  # Person CRUD MCP server (FastMCP)
+│   └── bank_server.py    # Bank account MCP server (FastMCP)
 ├── tools/
-│   ├── database.py       # Database connection manager
-│   ├── mcp_tool_wrapper.py # MCP tool sync wrapper
-│   ├── rag_tools.py      # RAG search tools
-│   └── serper_tool.py    # Social profile search
+│   ├── database.py       # SQLite database connection manager
+│   ├── rag_tools.py      # RAG search tools for documents
+│   └── serper_tool.py    # GitHub/LinkedIn profile search
 ├── rag/
-│   └── rag_pipeline.py   # RAG pipeline implementation
+│   └── rag_pipeline.py   # Qdrant-based RAG implementation
 ├── resources/            # PDF documents directory
-└── db/
-    └── main.db          # SQLite database
+├── db/
+│   └── main.db          # SQLite database
+└── chat-ui/             # Angular frontend (optional)
 
 ```
 
