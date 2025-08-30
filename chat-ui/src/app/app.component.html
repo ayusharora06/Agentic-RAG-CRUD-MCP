@@ -1,0 +1,50 @@
+<div class="chat-container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <button class="clear-btn" (click)="clearChat()">🗑️ Clear Chat</button>
+    
+    <div class="status">
+      <div [class.online]="backendStatus === 'online'" [class.offline]="backendStatus === 'offline'">
+        Backend: {{ backendStatus === 'online' ? 'Online 🟢' : 'Offline 🔴' }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Chat Area -->
+  <div class="main-chat">
+    <!-- Chat Messages -->
+    <div class="messages-container">
+      <div *ngFor="let message of chatService.messages" 
+           [class.user-message]="message.role === 'user'"
+           [class.assistant-message]="message.role === 'assistant'"
+           class="message">
+        <div class="message-role">{{ message.role === 'user' ? 'You' : 'Assistant' }}</div>
+        <div class="message-content">{{ message.content }}</div>
+      </div>
+      
+      <!-- Loading indicator -->
+      <div *ngIf="isLoading" class="message assistant-message">
+        <div class="message-role">Assistant</div>
+        <div class="message-content">Thinking...</div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-container">
+      <input 
+        type="text" 
+        [(ngModel)]="inputMessage" 
+        (keypress)="onKeyPress($event)"
+        placeholder="Ask me anything..."
+        class="chat-input"
+        [disabled]="isLoading"
+      />
+      <button 
+        (click)="sendMessage()" 
+        [disabled]="isLoading || !inputMessage.trim()"
+        class="send-btn">
+        Send
+      </button>
+    </div>
+  </div>
+</div>

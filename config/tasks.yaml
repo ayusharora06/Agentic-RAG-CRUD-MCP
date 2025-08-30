@@ -1,0 +1,116 @@
+analyze_query_task:
+  description: >
+    Analyze the user query: {query}
+    
+    Determine which type of operation this query requires:
+    
+    1. Database operations (CRUD) - Use this handler for:
+       - Creating, reading, updating, or deleting person or bank records
+       - Queries mentioning specific person names (e.g., "tell me about John", "show ayusha's data", "information about Sarah")
+       - Listing persons or accounts (e.g., "list all persons", "show all bank accounts")
+       - Getting information about specific individuals by name or ID
+       - JOIN operations between persons and bank accounts
+       - Queries about specific people's profiles or data
+    
+    2. Document retrieval (PDF/RAG) - Use this handler for:
+       - Questions about policies, insurance, coverage, terms, conditions
+       - General information from documents that don't mention person names
+       - Procedures, guidelines, rules from documents
+       - Abstract concepts or general knowledge questions
+    
+    3. Combined operations (multi) - Use this handler for:
+       - Queries that clearly need both person data AND document information
+       - Questions like "What is John's insurance coverage?"
+       - When you need to fetch person details AND search documents
+    
+    IMPORTANT RULES:
+    - If the query mentions what appears to be a person's name (like "ayusha", "john", "sarah"), 
+      default to CRUD handler to check the database first
+    - Phrases like "tell me about [name]" or "information about [name]" should route to CRUD
+    - Only use PDF handler if you're certain it's about documents, not people
+    - When uncertain, prefer CRUD or multi over PDF-only routing
+    
+    Consider if the query requires JOIN operations between person and bank tables.
+    
+    Provide a clear routing decision with confidence score.
+  expected_output: >
+    A routing decision in JSON format:
+    {
+      "handler": "crud" or "pdf" or "multi",
+      "needs_join": true or false,
+      "confidence": 0.0 to 1.0,
+      "reasoning": "explanation of the decision"
+    }
+
+execute_crud_task:
+  description: >
+    Execute this database operation: {query}
+    
+    IMPORTANT: For queries like "tell me about [name]", "information about [name]", or any general person inquiry:
+    1. First, get the person's complete record from the persons table
+    2. AUTOMATICALLY get ALL their bank accounts using get_person_with_accounts or list all accounts for that person_id
+    3. Search for their GitHub and LinkedIn profiles using the Search Social Profiles tool
+    4. Return a COMPREHENSIVE profile with ALL information found
+    
+    Use the appropriate MCP server tools to:
+    - For "tell me about" queries: ALWAYS use get_person_with_accounts to get person + ALL bank accounts
+    - Don't wait for specific requests - proactively gather ALL related data
+    - If someone asks about a person, they want EVERYTHING about that person
+    
+    Specific operations:
+    - Create, read, update, or delete person records
+    - Create, read, update, or delete bank account records  
+    - AUTOMATICALLY perform JOIN operations for any person lookup
+    
+    For ANY person retrieval (especially "tell me about"):
+    - Get complete person details (id, name, age, email)
+    - Get ALL their bank accounts (every single one, not just one)
+    - Get the total balance across all accounts
+    - Search for social profiles (GitHub, LinkedIn)
+    - Return everything in a well-structured format
+    
+    Remember: When someone says "tell me about joe-dev", they want:
+    - Joe's personal details
+    - ALL of Joe's bank accounts (not just one)
+    - Joe's social media profiles
+    - A complete picture of Joe's information
+    
+    Ensure data integrity and handle any errors appropriately.
+  expected_output: >
+    Database operation result with:
+    - Success status
+    - Affected records
+    - Any error messages
+    - Retrieved data if applicable
+    - For GET person operations: GitHub and LinkedIn profile URLs if found
+
+answer_document_task:
+  description: >
+    Answer this question using the PDF knowledge base: {query}
+    
+    Search through the indexed documents using the RAG pipeline.
+    Find the most relevant information to answer the user's question.
+    Provide comprehensive answers with source citations.
+    
+    MANDATORY SECURITY REQUIREMENT:
+    - ALWAYS mask EVERY occurrence of Aadhar card numbers in your ENTIRE response
+    - Aadhar numbers are 12-digit numbers (format: XXXX XXXX XXXX or XXXXXXXXXXXX)
+    - Replace them with XXXX-XXXX-[last 4 digits] consistently
+    - This applies to:
+      * Your main answer
+      * Supporting information sections
+      * Document quotes
+      * ANY place the Aadhar appears
+    
+    EXAMPLE:
+    If document contains: "Aadhar Number 3345 5678 9012"
+    You MUST show it as: "Aadhar Number XXXX-XXXX-9012"
+    Be consistent - the same Aadhar must always show the same last 4 digits!
+    
+  expected_output: >
+    A comprehensive answer including:
+    - Direct answer to the question (with ALL Aadhar numbers masked)
+    - Supporting information from documents (with ALL Aadhar numbers masked)
+    - Source citations (document name, page number)
+    - Confidence score for the answer
+    - EVERY Aadhar number must be masked as XXXX-XXXX-[last 4 digits] throughout
