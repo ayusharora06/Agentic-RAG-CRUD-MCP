@@ -144,11 +144,12 @@ class SupervisorMultiAgentCrew:
                     
                     # Agent 2: RAG + Serper Agent (Documents and Profiles)
                     rag_agent = Agent(
-                        role="Document and Profile Research Specialist",
-                        goal="Find information from documents and search for social profiles",
+                        role="Document and Profile Research Specialist with Privacy Protection",
+                        goal="Find information from documents while protecting sensitive data like Aadhar numbers",
                         backstory="""You are an expert in:
                         - Document search: Finding information in PDFs (policies, insurance)
                         - Profile search: Finding GitHub and LinkedIn profiles
+                        - Privacy protection: Masking sensitive information
                         
                         You search for:
                         - Insurance details, policy information
@@ -156,7 +157,17 @@ class SupervisorMultiAgentCrew:
                         - Aadhar numbers in documents
                         - Social media profiles for people
                         
-                        When masking Aadhar, replace all but last 4 digits with XXXX.""",
+                        CRITICAL PRIVACY REQUIREMENT:
+                        You MUST mask ALL Aadhar numbers in your ENTIRE response for privacy protection.
+                        Aadhar numbers are 12-digit numbers (like 3345 5678 9012 or 334556789012).
+                        
+                        WHENEVER you see an Aadhar number, you MUST:
+                        1. Replace it with XXXX-XXXX-[last 4 digits]
+                        2. Example: "3345 5678 9012" becomes "XXXX-XXXX-9012"
+                        3. Example: "334556789012" becomes "XXXX-XXXX-9012"
+                        
+                        This applies EVERYWHERE in your response - no exceptions!
+                        Even when quoting from documents, mask the Aadhar numbers.""",
                         tools=[
                             SearchDocumentsTool(),
                             ProfileSearchTool()
@@ -281,8 +292,15 @@ class SupervisorMultiAgentCrew:
                         if route == "RAG" or route == "BOTH":
                             print("📚 Executing RAG Agent...")
                             rag_task = Task(
-                                description=f"Answer this query using document search and profile tools: {query}",
-                                expected_output="Document information and/or social profiles",
+                                description=f"""Answer this query using document search and profile tools: {query}
+                                
+                                MANDATORY: When you find any Aadhar numbers in documents:
+                                1. You MUST mask them as XXXX-XXXX-[last 4 digits]
+                                2. Never show full Aadhar numbers in your response
+                                3. Example: If document contains "3345 5678 9012", show it as "XXXX-XXXX-9012"
+                                
+                                This is a privacy requirement - mask ALL Aadhar numbers in your entire response.""",
+                                expected_output="Document information with Aadhar numbers masked and/or social profiles",
                                 agent=rag_agent
                             )
                             rag_crew = Crew(
@@ -312,6 +330,10 @@ class SupervisorMultiAgentCrew:
                                 3. NEVER mentions "agents", "MCP", "RAG", "sources", or "combined results"
                                 4. Flows as a single, coherent response
                                 5. Uses natural language as if you're the sole source of knowledge
+                                6. MAINTAINS privacy: Keep any Aadhar numbers masked as XXXX-XXXX-[last 4 digits]
+                                
+                                PRIVACY: If the information contains masked Aadhar numbers (XXXX-XXXX-XXXX), 
+                                keep them masked in your unified answer. Do not unmask them.
                                 
                                 Example good answer:
                                 "Joe-dev is a 28-year-old developer with email joe@dev.com. He has 2 bank accounts 
@@ -321,7 +343,7 @@ class SupervisorMultiAgentCrew:
                                 Example bad answer:
                                 "From the database: Joe is 28... From documents: His insurance..."
                                 """,
-                                expected_output="Single, natural, unified answer",
+                                expected_output="Single, natural, unified answer with privacy protection",
                                 agent=supervisor_agent
                             )
                             
